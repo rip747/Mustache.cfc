@@ -1,2 +1,7 @@
 mxunit
-.project
+.*
+!.gitignore
+!.htaccess
+/settings.xml
+*.iml
+/out

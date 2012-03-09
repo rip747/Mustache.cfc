@@ -1,12 +1,13 @@
 <cfcomponent extends="mxunit.framework.TestCase">
 
-  <cffunction name="setup">
-    <cfset stache = createObject("component", "mustache.Mustache").init()/>
-  </cffunction>
+	<cffunction name="setup">
+		<cfset partials = {}/>
+		<cfset stache = createObject("component", "mustache.Mustache").init()/>
+	</cffunction>
 
-   <cffunction name="tearDown">
-    <cfset assertEquals(expected, stache.render(template, context)) />
-  </cffunction>
+	<cffunction name="tearDown">
+		<cfset assertEquals(expected, stache.render(template, context, partials))/>
+	</cffunction>
 
   <cffunction name="basic">
     <cfset context = { thing = 'world'} />
@@ -209,6 +210,36 @@
     <cfset template = "<ul><li>Say {{word}}, {{name}}.</li><li>{{> gracie_allen}}</li></ul>" />
     <cfset expected = "<ul><li>Say Goodnight, Gracie.</li><li>Goodnight</li></ul>" />
   </cffunction>
+
+	<cffunction name="globalRegisteredPartial">
+		<!--- reinit, passing in the global partial --->
+		<cfscript>
+			var initPartials =
+			{
+				gracie_allen = fileRead(expandPath("/tests/gracie_allen.mustache"))
+			};
+		</cfscript>
+
+		<cfset stache = createObject("component", "mustache.Mustache").init(initPartials)/>
+		<cfset context = { word = 'Goodnight', name = 'Gracie' }/>
+		<cfset template = "<ul><li>Say {{word}}, {{name}}.</li><li>{{> gracie_allen}}</li></ul>"/>
+		<cfset expected = "<ul><li>Say Goodnight, Gracie.</li><li>Goodnight</li></ul>"/>
+	</cffunction>
+
+	<cffunction name="runtimeRegisteredPartial">
+
+		<cfscript>
+			partials =
+			{
+				gracie_allen = fileRead(expandPath("/tests/gracie_allen.mustache"))
+			};
+		</cfscript>
+
+		<cfset context = { word = 'Goodnight', name = 'Gracie' }/>
+		<cfset template = "<ul><li>Say {{word}}, {{name}}.</li><li>{{> gracie_allen}}</li></ul>"/>
+		<cfset expected = "<ul><li>Say Goodnight, Gracie.</li><li>Goodnight</li></ul>"/>
+
+	</cffunction>
 
 	<cffunction name="invertedSectionHiddenIfStructureNotEmpty">
 		<cfset context =  {set = {something='whatever'}}  />

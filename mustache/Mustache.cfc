@@ -27,7 +27,7 @@ OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION
 WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 --->
 
-<cfcomponent>
+<cfcomponent output="false">
 
 	<!---
 	reference for string building
@@ -36,21 +36,29 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
 	<cfset variables.SectionRegEx = CreateObject("java","java.util.regex.Pattern").compile("\{\{(##|\^)\s*(\w+)\s*}}(.*?)\{\{/\s*\2\s*\}\}", 32)>
 	<cfset variables.TagRegEx = CreateObject("java","java.util.regex.Pattern").compile("\{\{(!|\{|&|\>)?\s*(\w+).*?\}?\}\}", 32) />
+	<cfset variables.partials = {} />
 
 	<cffunction name="init" output="false">
+		<cfargument name="partials" hint="the partial objects" default="#{}#">
+
+		<cfset variables.partials = arguments.partials />
 		<cfreturn this />
 	</cffunction>
 
 	<cffunction name="render" output="false">
 		<cfargument name="template" default="#readMustacheFile(ListLast(getMetaData(this).name, '.'))#"/>
 		<cfargument name="context" default="#this#"/>
-		<cfset arguments.template = renderSections(arguments.template, arguments.context) />
-		<cfreturn renderTags(arguments.template, arguments.context)/>
+		<cfargument name="partials" hint="the partial objects" required="true" default="#{}#">
+
+		<cfset structAppend(arguments.partials, variables.partials, false)/>
+		<cfset arguments.template = renderSections(arguments.template, arguments.context, arguments.partials) />
+		<cfreturn renderTags(arguments.template, arguments.context, arguments.partials)/>
 	</cffunction>
 
 	<cffunction name="renderSections" access="private" output="false">
 		<cfargument name="template" />
 		<cfargument name="context" />
+		<cfargument name="partials" />
 		<cfset var loc = {}>
 	
 		<cfloop condition = "true">
@@ -62,7 +70,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 			<cfset loc.type = loc.matches[2] />
 			<cfset loc.tagName = loc.matches[3] />
 			<cfset loc.inner = loc.matches[4] />
-			<cfset arguments.template = replace(arguments.template, loc.tag, renderSection(loc.tagName, loc.type, loc.inner, arguments.context))/>
+			<cfset arguments.template = replace(arguments.template, loc.tag, renderSection(loc.tagName, loc.type, loc.inner, arguments.context, arguments.partials))/>
 		</cfloop>
 		<cfreturn arguments.template/>
 	</cffunction>
@@ -72,15 +80,16 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		<cfargument name="type"/>
 		<cfargument name="inner"/>
 		<cfargument name="context"/>
+		<cfargument name="partials" />
 		<cfset var loc = {}>
 
 		<cfset loc.ctx = get(arguments.tagName, arguments.context) />
 		<cfif arguments.type neq "^" and isStruct(loc.ctx) and !StructIsEmpty(loc.ctx)>
-			<cfreturn render(arguments.inner, loc.ctx) />
+			<cfreturn render(arguments.inner, loc.ctx, arguments.partials) />
 		<cfelseif arguments.type neq "^" and isQuery(loc.ctx) AND loc.ctx.recordCount>
-			<cfreturn renderQuerySection(arguments.inner, loc.ctx) />
+			<cfreturn renderQuerySection(arguments.inner, loc.ctx, arguments.partials) />
 		<cfelseif arguments.type neq "^" and isArray(loc.ctx) and !ArrayIsEmpty(loc.ctx)>
-			<cfreturn renderArraySection(arguments.inner, loc.ctx) />
+			<cfreturn renderArraySection(arguments.inner, loc.ctx, arguments.partials) />
 		<cfelseif arguments.type neq "^" and structKeyExists(arguments.context, arguments.tagName) and isCustomFunction(arguments.context[arguments.tagName])>
 			<cfreturn evaluate("arguments.context.#arguments.tagName#(arguments.inner)") />
 		</cfif>
@@ -123,9 +132,10 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	<cffunction name="renderQuerySection" access="private" output="false">
 		<cfargument name="template"/>
 		<cfargument name="context"/>
+		<cfargument name="partials" />
 		<cfset var result = [] />
 		<cfloop query="arguments.context">
-		<cfset ArrayAppend(result, render(arguments.template, arguments.context)) />
+		<cfset ArrayAppend(result, render(arguments.template, arguments.context, arguments.partials)) />
 		</cfloop>
 		<cfreturn ArrayToList(result, "") />
 	</cffunction>
@@ -133,11 +143,12 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	<cffunction name="renderArraySection" access="private" output="false">
 		<cfargument name="template"/>
 		<cfargument name="context"/>
+		<cfargument name="partials" />
 		<cfset var loc = {}>
 
 		<cfset loc.result = [] />
 		<cfloop array="#arguments.context#" index="loc.item">
-			<cfset ArrayAppend(loc.result, render(arguments.template, loc.item)) />
+			<cfset ArrayAppend(loc.result, render(arguments.template, loc.item, arguments.partials)) />
 		</cfloop>
 		<cfreturn ArrayToList(loc.result, "") />
 	</cffunction>
@@ -145,6 +156,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 	<cffunction name="renderTags" access="private" output="false">
 		<cfargument name="template"/>
 		<cfargument name="context" />
+		<cfargument name="partials" />
 		<cfset var loc = {}>
 		
 		<cfloop condition = "true" >
@@ -155,7 +167,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 			<cfset loc.tag = loc.matches[1]/>
 			<cfset loc.type = loc.matches[2] />
 			<cfset loc.tagName = loc.matches[3] />
-			<cfset arguments.template = replace(arguments.template, loc.tag, renderTag(loc.type, loc.tagName, arguments.context))/>
+			<cfset arguments.template = replace(arguments.template, loc.tag, renderTag(loc.type, loc.tagName, arguments.context, arguments.partials))/>
 		</cfloop>
 		<cfreturn arguments.template/>
 	</cffunction>
@@ -164,15 +176,29 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 		<cfargument name="type" />
 		<cfargument name="tagName" />
 		<cfargument name="context" />
+		<cfargument name="partials" />
 		<cfif arguments.type eq "!">
 			<cfreturn "" />
 		<cfelseif arguments.type eq "{" or arguments.type eq "&">
 			<cfreturn get(arguments.tagName, arguments.context) />
 		<cfelseif arguments.type eq ">">
-			<cfreturn render(readMustacheFile(arguments.tagName), arguments.context) />
+			<cfreturn renderPartial(arguments.tagName, arguments.context, arguments.partials) />
 		<cfelse>
 			<cfreturn htmlEditFormat(get(arguments.tagName, arguments.context)) />
 		</cfif>
+	</cffunction>
+	
+	<cffunction name="renderPartial" hint="If we have the partial registered, use that, otherwise use the registered text" access="private" returntype="string" output="false">
+		<cfargument name="name" hint="the name of the partial" required="true">
+		<cfargument name="context" hint="the context" required="true">
+		<cfargument name="partials" hint="the partial objects" required="true">
+
+		<cfif structKeyExists(arguments.partials, arguments.name)>
+			<cfreturn render(arguments.partials[arguments.name], arguments.context, arguments.partials) />
+		<cfelse>
+			<cfreturn render(readMustacheFile(arguments.name), arguments.context, arguments.partials) />
+		</cfif>
+
 	</cffunction>
 
 	<cffunction name="readMustacheFile" access="private" output="false">
@@ -222,6 +248,15 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 			</cfloop>
 		</cfif>
 		<cfreturn loc.results />
+	</cffunction>
+
+	<cffunction name="getPartials" access="public" output="false">
+		<cfreturn variables.partials />
+	</cffunction>
+
+	<cffunction name="setPartials" access="public" returntype="void" output="false">
+		<cfargument name="partials" required="true">
+		<cfset variables.partials = arguments.partials />
 	</cffunction>
 
 </cfcomponent>
