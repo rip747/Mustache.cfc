@@ -9,7 +9,7 @@
 </cfif>
 
 <cfif thisTag.executionMode eq "end">
-	<cfset thisTag.generatedContent = trim(attributes.mustache.render(template = thisTag.generatedContent, context = attributes.context, partials = attributes.partials)) />
+	<cfset thisTag.generatedContent = attributes.mustache.render(template = thisTag.generatedContent, context = attributes.context, partials = attributes.partials) />
 </cfif>
 
 <cfsetting enablecfoutputonly="false"/>
