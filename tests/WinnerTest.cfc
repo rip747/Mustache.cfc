@@ -9,8 +9,7 @@
     <cfset expected = "Hello Patrick
 You have just won $10000!
 
-Well, $6000, after taxes.
-" />
+Well, $6000, after taxes." />
     <cfset assertEquals(expected, winner.render()) />
   </cffunction>
 

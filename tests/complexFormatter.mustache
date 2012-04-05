@@ -1,0 +1,16 @@
+{{#Settings.EnableEmailUpdates}}
+Please do not respond to this message. This is for information purposes only.
+
+{{/Settings.EnableEmailUpdates}}
+FOR SECURITY PURPOSES, PLEASE DO NOT FORWARD THIS EMAIL TO OTHERS.
+
+A new ticket has been entered and {{#Assignee.Name}}assigned to {{Assignee.Name}}{{/Assignee.Name}}{{^Assignee.Name}}is UNASSIGNED{{/Assignee.Name}}.
++----------------------------------------------------------------------------+
+|  Ticket: {{Ticket.Number:leftPad(28) }} Priority: {{Ticket.Priority:leftPad(27)}}|
+|    Name: {{Customer.Name:leftPad(28) }}    Phone: {{Customer.Phone:leftPad(27)}}|
+| Subject: {{Ticket.Subject:leftPad(66)                                    }}|
++----------------------------------------------------------------------------+
+{{#Ticket.Description}}
+Description:
+{{Ticket.Description}}
+{{/Ticket.Description}}
