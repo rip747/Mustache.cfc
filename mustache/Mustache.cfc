@@ -42,11 +42,13 @@
 	<cfset variables.HeadTailBlankLinesRegEx = createObject("java","java.util.regex.Pattern").compile(javaCast("string", "(^(\r?\n))|((?<!(\r?\n))(\r?\n)$)"), 32) />
 	<!---// for tracking partials //--->
 	<cfset variables.partials = {} />
+	<cfset variables.reFindCache = {}/>
 
 	<cffunction name="init" output="false">
 		<cfargument name="partials" hint="the partial objects" default="#StructNew()#">
 
-		<cfset variables.partials = arguments.partials />
+		<cfset setPartials(arguments.partials) />
+
 		<cfreturn this />
 	</cffunction>
 
@@ -298,10 +300,18 @@
 	<cffunction name="ReFindNoCaseValues" access="private" output="false">
 		<cfargument name="text"/>
 		<cfargument name="re"/>
+
+		<!--- store the result trees in cache, save on reparsing.
+			removed all scope prefixes for speed --->
+		<cfset var key = text & ":" & re />
+		<cfif structKeyExists(reFindCache, key)>
+			<cfreturn reFindCache[key] />
+		</cfif>
+
 		<cfset var loc = {}>
 
 		<cfset loc.results = []/>
-		<cfset loc.matcher = arguments.re.matcher(arguments.text)/>
+		<cfset loc.matcher = re.matcher(text)/>
 		<cfset loc.i = 0 />
 		<cfset loc.nextMatch = "" />
 		<cfif loc.matcher.Find()>
@@ -314,6 +324,9 @@
 				</cfif>
 			</cfloop>
 		</cfif>
+
+		<cfset reFindCache[key] = loc.results />
+
 		<cfreturn loc.results />
 	</cffunction>
 
