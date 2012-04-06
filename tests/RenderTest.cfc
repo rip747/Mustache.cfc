@@ -13,9 +13,6 @@
 		<cfabort />
 --->
 		<cfset assertEquals(expected, stache.render(template, context, partials))/>
-
-		<!--- since we now have regex result caching, run it again, make sure nothing changes --->
-		<cfset assertEquals(expected, stache.render(template, context, partials))/>
 	</cffunction>
 
   <cffunction name="basic">

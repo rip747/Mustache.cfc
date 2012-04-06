@@ -42,7 +42,6 @@
 	<cfset variables.HeadTailBlankLinesRegEx = createObject("java","java.util.regex.Pattern").compile(javaCast("string", "(^(\r?\n))|((?<!(\r?\n))(\r?\n)$)"), 32) />
 	<!---// for tracking partials //--->
 	<cfset variables.partials = {} />
-	<cfset variables.reFindCache = {}/>
 
 	<cffunction name="init" output="false">
 		<cfargument name="partials" hint="the partial objects" default="#StructNew()#">
@@ -117,42 +116,52 @@
 		<cfargument name="inner"/>
 		<cfargument name="context"/>
 		<cfargument name="partials" />
-		<cfset var loc = {}>
+		<cfset var local = {}>
 
-		<cfset loc.ctx = get(arguments.tagName, arguments.context) />
-		<cfif arguments.type neq "^" and isStruct(loc.ctx) and !StructIsEmpty(loc.ctx)>
-			<cfreturn renderFragment(arguments.inner, loc.ctx, arguments.partials) />
-		<cfelseif arguments.type neq "^" and isQuery(loc.ctx) AND loc.ctx.recordCount>
-			<cfreturn renderQuerySection(arguments.inner, loc.ctx, arguments.partials) />
-		<cfelseif arguments.type neq "^" and isArray(loc.ctx) and !ArrayIsEmpty(loc.ctx)>
-			<cfreturn renderArraySection(arguments.inner, loc.ctx, arguments.partials) />
+		<cfset local.ctx = get(arguments.tagName, arguments.context, arguments.partials) />
+
+		<cfif arguments.type neq "^" and isStruct(local.ctx) and !StructIsEmpty(local.ctx)>
+			<cfreturn renderFragment(arguments.inner, local.ctx, arguments.partials) />
+		<cfelseif arguments.type neq "^" and isQuery(local.ctx) AND local.ctx.recordCount>
+			<cfreturn renderQuerySection(arguments.inner, local.ctx, arguments.partials) />
+		<cfelseif arguments.type neq "^" and isArray(local.ctx) and !ArrayIsEmpty(local.ctx)>
+			<cfreturn renderArraySection(arguments.inner, local.ctx, arguments.partials) />
 		<cfelseif arguments.type neq "^" and structKeyExists(arguments.context, arguments.tagName) and isCustomFunction(arguments.context[arguments.tagName])>
-			<cfreturn evaluate("arguments.context.#arguments.tagName#(arguments.inner)") />
+			<cfreturn renderLambda(arguments.tagName, arguments.inner, arguments.context, arguments.partials) />
 		</cfif>
 
-		<cfif arguments.type eq "^" xor convertToBoolean(loc.ctx)>
+		<cfif arguments.type eq "^" xor convertToBoolean(local.ctx)>
 			<cfreturn arguments.inner />
 		</cfif>
 		<cfreturn "" />
 	</cffunction>
 
+	<cffunction name="renderLambda" hint="render a lambda function (also provides a hook if you want to extend how lambdas works)" access="private" returntype="string" output="false">
+		<cfargument name="tagName" />
+		<cfargument name="template"  />
+		<cfargument name="context"  />
+		<cfargument name="partials" />
+
+		<cfreturn evaluate("arguments.context.#arguments.tagName#(arguments.template)") />
+	</cffunction>
+
 	<cffunction name="convertToBoolean">
 		<cfargument name="value"/>
 
-		<cfif isBoolean(arguments.value)>
-			<cfreturn arguments.value />
+		<cfif isBoolean(value)>
+			<cfreturn value />
 		</cfif>
-		<cfif IsSimpleValue(arguments.value)>
-			<cfreturn arguments.value neq "" />
+		<cfif IsSimpleValue(value)>
+			<cfreturn value neq "" />
 		</cfif>
-		<cfif isStruct(arguments.value)>
-			<cfreturn !StructIsEmpty(arguments.value)>
+		<cfif isStruct(value)>
+			<cfreturn !StructIsEmpty(value)>
 		</cfif>
-		<cfif isQuery(arguments.value)>
-			<cfreturn arguments.value.recordcount neq 0>
+		<cfif isQuery(value)>
+			<cfreturn value.recordcount neq 0>
 		</cfif>
-		<cfif isArray(arguments.value)>
-			<cfreturn !ArrayIsEmpty(arguments.value)>
+		<cfif isArray(value)>
+			<cfreturn !ArrayIsEmpty(value)>
 		</cfif>
 
 		<cfreturn false>
@@ -177,16 +186,16 @@
 		<cfargument name="template"/>
 		<cfargument name="context"/>
 		<cfargument name="partials" />
-		<cfset var loc = {}>
+		<cfset var local = {}>
 
 		<!---// trim the trailing whitespace--so we don't print extra lines //--->
 		<cfset arguments.template = rtrim(arguments.template) />
 
-		<cfset loc.result = [] />
-		<cfloop array="#arguments.context#" index="loc.item">
-			<cfset ArrayAppend(loc.result, renderFragment(arguments.template, loc.item, arguments.partials)) />
+		<cfset local.result = [] />
+		<cfloop array="#arguments.context#" index="local.item">
+			<cfset ArrayAppend(local.result, renderFragment(arguments.template, local.item, arguments.partials)) />
 		</cfloop>
-		<cfreturn ArrayToList(loc.result, "") />
+		<cfreturn ArrayToList(local.result, "") />
 	</cffunction>
 
   <cffunction name="renderTags" access="private" output="false">
@@ -226,11 +235,11 @@
     <cfif type eq "!">
 			<cfreturn "" />
 		<cfelseif (arguments.type eq "{") or (arguments.type eq "&")>
-			<cfset results = get(arguments.tagName, arguments.context) />
+			<cfset results = get(arguments.tagName, arguments.context, arguments.partials) />
 		<cfelseif arguments.type eq ">">
 			<cfset results = renderPartial(arguments.tagName, arguments.context, arguments.partials) />
     <cfelse>
-			<cfset results = htmlEditFormat(get(arguments.tagName, arguments.context)) />
+			<cfset results = htmlEditFormat(get(arguments.tagName, arguments.context, arguments.partials)) />
     </cfif>
 
 		<cfreturn onRenderTag(results, arguments) />
@@ -268,6 +277,7 @@
 	<cffunction name="get" access="private" output="false">
 		<cfargument name="key" />
 		<cfargument name="context" />
+		<cfargument name="partials" />
 
 		<cfset var local = {} />
 
@@ -276,13 +286,13 @@
 			<cfset local.key = listRest(key, ".") />
 			<cfset local.root = listFirst(key, ".") />
 			<cfif structKeyExists(context, local.root)>
-				<cfreturn get(local.key, context[local.root]) />
+				<cfreturn get(local.key, context[local.root], arguments.partials) />
 			<cfelse>
 				<cfreturn "" />
 			</cfif>
 		<cfelseif isStruct(arguments.context) && structKeyExists(arguments.context, arguments.key) >
 			<cfif isCustomFunction(arguments.context[arguments.key])>
-				<cfreturn evaluate("arguments.context.#arguments.key#('')")>
+				<cfreturn renderLambda(arguments.key, '', arguments.context, arguments.partials) />
 			<cfelse>
 				<cfreturn arguments.context[arguments.key]/>
 			</cfif>
@@ -301,33 +311,24 @@
 		<cfargument name="text"/>
 		<cfargument name="re"/>
 
-		<!--- store the result trees in cache, save on reparsing.
-			removed all scope prefixes for speed --->
-		<cfset var key = text & ":" & re />
-		<cfif structKeyExists(reFindCache, key)>
-			<cfreturn reFindCache[key] />
-		</cfif>
+		<cfset var local = {}>
 
-		<cfset var loc = {}>
-
-		<cfset loc.results = []/>
-		<cfset loc.matcher = re.matcher(text)/>
-		<cfset loc.i = 0 />
-		<cfset loc.nextMatch = "" />
-		<cfif loc.matcher.Find()>
-			<cfloop index="loc.i" from="0" to="#loc.matcher.groupCount()#">
-				<cfset loc.nextMatch = loc.matcher.group(loc.i) />
-				<cfif isDefined('loc.nextMatch')>
-					<cfset arrayAppend(loc.results, loc.nextMatch) />
+		<cfset local.results = []/>
+		<cfset local.matcher = re.matcher(text)/>
+		<cfset local.i = 0 />
+		<cfset local.nextMatch = "" />
+		<cfif local.matcher.Find()>
+			<cfloop index="local.i" from="0" to="#local.matcher.groupCount()#">
+				<cfset local.nextMatch = local.matcher.group(local.i) />
+				<cfif isDefined('local.nextMatch')>
+					<cfset arrayAppend(local.results, local.nextMatch) />
 				<cfelse>
-					<cfset arrayAppend(loc.results, "") />
+					<cfset arrayAppend(local.results, "") />
 				</cfif>
 			</cfloop>
 		</cfif>
 
-		<cfset reFindCache[key] = loc.results />
-
-		<cfreturn loc.results />
+		<cfreturn local.results />
 	</cffunction>
 
 	<cffunction name="getPartials" access="public" output="false">
