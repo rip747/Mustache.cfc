@@ -203,6 +203,16 @@
     <cfset expected = "Mustache was created by Chris Wanstrath." />
   </cffunction>
 
+  <cffunction name="lambdaTest" access="private">
+		<cfreturn "Chris Wanstrath" />
+	</cffunction>
+
+  <cffunction name="lambda">
+		<cfset context = {fullname=lambdaTest} />
+    <cfset template = "Mustache was created by {{fullname}}." />
+    <cfset expected = "Mustache was created by Chris Wanstrath." />
+  </cffunction>
+
   <cffunction name="filter">
     <cfset context = createObject("component", "Filter")/>
     <cfset template = "Hello, {{##bold}}world{{/bold}}." />
