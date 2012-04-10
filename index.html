@@ -1,0 +1,122 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <title>Mustache.cfc by rip747</title>
+    <link rel="stylesheet" href="stylesheets/styles.css">
+    <link rel="stylesheet" href="stylesheets/pygment_trac.css">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.7.1/jquery.min.js"></script>
+    <script src="javascripts/respond.js"></script>
+    <!--[if lt IE 9]>
+      <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+    <!--[if lt IE 8]>
+    <link rel="stylesheet" href="stylesheets/ie.css">
+    <![endif]-->
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+
+  </head>
+  <body>
+
+      <div id="header">
+        <nav>
+          <li class="fork"><a href="https://github.com/rip747/Mustache.cfc">Fork On GitHub</a></li>
+          <li class="downloads"><a href="https://github.com/rip747/Mustache.cfc/zipball/master">ZIP</a></li>
+          <li class="downloads"><a href="https://github.com/rip747/Mustache.cfc/tarball/master">TAR</a></li>
+          <li class="title">DOWNLOADS</li>
+        </nav>
+      </div><!-- end header -->
+
+    <div class="wrapper">
+
+      <section>
+        <div id="title">
+          <h1>Mustache.cfc</h1>
+          <p>{{ mustache }} for ColdFusion</p>
+          <hr>
+          <span class="credits left">Project maintained by <a href="https://github.com/rip747">rip747</a></span>
+          <span class="credits right">Hosted on GitHub Pages &mdash; Theme by <a href="http://twitter.com/#!/michigangraham">mattgraham</a></span>
+        </div>
+
+        <h1>Mustache.cfc</h1>
+
+<p>Chris Wanstrath's <a href="http://mustache.github.com/">Mustache</a> templates for <a href="https://github.com/pmcelhaney/Mustache.cfc">ColdFusion</a>.</p>
+
+<h2>Installation</h2>
+
+<p>Mustache is a single component. To install, download the Mustache.cfc file from the mustache directory.</p>
+
+<h2>Basic Usage</h2>
+
+<pre><code>&lt;cfset mustache = createObject("component", "Mustache").init()&gt;
+&lt;cfset template = "Hello, {{thing}}!"&gt;
+&lt;cfset context = structNew()&gt;
+&lt;cfset context['thing'] = 'World'&gt;
+
+&lt;cfouptut&gt;#mustache.render(template, context)#&lt;/cfouptut&gt;
+</code></pre>
+
+<h2>Creating Views</h2>
+
+<p>Given a template named Winner.mustache:</p>
+
+<pre><code>Hello {{name}}
+You have just won ${{value}}!
+{{#in_ca}}
+Well, ${{taxed_value}}, after taxes.
+{{/in_ca}}
+</code></pre>
+
+<p>And a view named Winner.cfc:</p>
+
+<pre><code>&lt;cfcomponent extends="Mustache"&gt;
+  &lt;cffunction name="taxed_value"&gt;
+    &lt;cfreturn this.value * 0.6&gt;
+  &lt;/cffunction&gt;
+&lt;/cfcomponent&gt;
+</code></pre>
+
+<p>You can render the view like so:</p>
+
+<pre><code>&lt;cfset winner = createObject("component", "Winner")&gt;
+&lt;cfset winner.name = "Patrick"&gt;
+&lt;cfset winner.value = "1000"&gt;
+&lt;cfset winner.in_ca = true&gt;
+&lt;cfoutput&gt;#winner.render()#&lt;/cfoutput&gt;
+</code></pre>
+
+<p>Result:</p>
+
+<pre><code>Hello Patrick
+You have just won $1000!
+Well, $600, after taxes.
+</code></pre>
+
+<p>A custom tag is also included so you can render templates like so:</p>
+
+<pre><code>&lt;cfset context = {
+    name = "Patrick",
+    value = 1000,
+    in_ca = true,
+    taxed_value = 600
+} /&gt;
+
+&lt;cfimport taglib="/path/to/mustache/dir" prefix="stache" /&gt;
+&lt;stache:mustache context="#context#"&gt;
+&lt;cfoutput&gt;
+Hello {{name}}
+You have just won ${{value}}!
+{{##in_ca}}
+Well, ${{taxed_value}}, after taxes.
+{{/in_ca}}
+&lt;/cfoutput&gt;
+&lt;/stache:mustache&gt;
+</code></pre>
+      </section>
+
+    </div>
+    <!--[if !IE]><script>fixScale(document);</script><!--<![endif]-->
+    
+  </body>
+</html>
