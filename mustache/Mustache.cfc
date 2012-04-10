@@ -1,19 +1,37 @@
 <cfcomponent output="false">
-	<!---
+	<!---//
+		Mustache.cfc
+
+		This component is a ColdFusion implementation of the Mustache logic-less templating language (see http://mustache.github.com/.)
+
+		Key features of this implemenation:
+
+		* Enhanced whitespace management - extra whitespace around conditional output is automatically removed
+		* Partials
+		* Multi-line comments
+		* And can be extended via the onRenderTag event to add additional rendering logic
+
+		Homepage:     https://github.com/rip747/Mustache.cfc
+		Source Code:  https://github.com/rip747/Mustache.cfc.git
+
+		NOTES:
 		reference for string building
 		http://www.aliaspooryorik.com/blog/index.cfm/e/posts.details/post/string-concatenation-performance-test-128
-	 --->
+	//--->
+
+	<!--- namespace for Mustache private variables (to avoid name collisions when extending Mustache.cfc) --->
+	<cfset variables.Mustache = structNew() />
 
 	<!--- captures the ".*" match for looking for formatters (see #2) and also allows nested structure references (see #3), removes looking for comments --->
-	<cfset variables.TagRegEx = createObject("java","java.util.regex.Pattern").compile("\{\{(\{|&|\>)?\s*(\w+(?:(?:\.\w+){1,})?)(.*?)\}?\}\}", 32)/>
-	<!--- captures nested structure references (see #3) --->
-	<cfset variables.SectionRegEx = createObject("java","java.util.regex.Pattern").compile("\{\{(##|\^)\s*(\w+(?:(?:\.\w+){1,})?)\s*}}(.*?)\{\{/\s*\2\s*\}\}", 32)/>
-	<!--- captures nested structure references (see #3) --->
-	<cfset variables.CommentRegEx = createObject("java","java.util.regex.Pattern").compile("((^\r?\n?)|\s+)?\{\{!.*?\}\}(\r?\n?(\r?\n?)?)?", 40)/>
-	<!--- captures nested structure references (see #3) --->
-	<cfset variables.HeadTailBlankLinesRegEx = createObject("java","java.util.regex.Pattern").compile(javaCast("string", "(^(\r?\n))|((?<!(\r?\n))(\r?\n)$)"), 32)/>
+	<cfset variables.Mustache.TagRegEx = createObject("java","java.util.regex.Pattern").compile("\{\{(\{|&|\>)?\s*(\w+(?:(?:\.\w+){1,})?)(.*?)\}?\}\}", 32)/>
+	<!--- captures nested structure references --->
+	<cfset variables.Mustache.SectionRegEx = createObject("java","java.util.regex.Pattern").compile("\{\{(##|\^)\s*(\w+(?:(?:\.\w+){1,})?)\s*}}(.*?)\{\{/\s*\2\s*\}\}", 32)/>
+	<!--- captures nested structure references --->
+	<cfset variables.Mustache.CommentRegEx = createObject("java","java.util.regex.Pattern").compile("((^\r?\n?)|\s+)?\{\{!.*?\}\}(\r?\n?(\r?\n?)?)?", 40)/>
+	<!--- captures nested structure references --->
+	<cfset variables.Mustache.HeadTailBlankLinesRegEx = createObject("java","java.util.regex.Pattern").compile(javaCast("string", "(^(\r?\n))|((?<!(\r?\n))(\r?\n)$)"), 32)/>
 	<!--- for tracking partials --->
-	<cfset variables.partials = {}/>
+	<cfset variables.Mustache.partials = {}/>
 
 	<cffunction name="init" access="public" output="false"
 		hint="initalizes and returns the object">
@@ -32,7 +50,7 @@
 		<cfset var results = renderFragment(argumentCollection=arguments)/>
 
 		<!--- remove single blank lines at the head/tail of the stream --->
-		<cfset results = variables.HeadTailBlankLinesRegEx.matcher(javaCast("string", results)).replaceAll("")/>
+		<cfset results = variables.Mustache.HeadTailBlankLinesRegEx.matcher(javaCast("string", results)).replaceAll("")/>
 
 		<cfreturn results/>
 	</cffunction>
@@ -44,9 +62,9 @@
 		<cfargument name="partials" hint="the partial objects" required="true" default="#structNew()#"/>
 
 		<!--- clean the comments from the template --->
-		<cfset arguments.template = variables.CommentRegEx.matcher(javaCast("string", arguments.template)).replaceAll("$3")/>
+		<cfset arguments.template = variables.Mustache.CommentRegEx.matcher(javaCast("string", arguments.template)).replaceAll("$3")/>
 
-		<cfset structAppend(arguments.partials, variables.partials, false)/>
+		<cfset structAppend(arguments.partials, variables.Mustache.partials, false)/>
 		<cfset arguments.template = renderSections(arguments.template, arguments.context, arguments.partials)/>
 		<cfreturn renderTags(arguments.template, arguments.context, arguments.partials)/>
 	</cffunction>
@@ -56,21 +74,21 @@
 		<cfargument name="context"/>
 		<cfargument name="partials"/>
 		<cfset var loc = {}/>
-	
+
 		<cfloop condition = "true">
-		
-			<cfset loc.matches = ReFindNoCaseValues(arguments.template, variables.SectionRegEx)/>
-		
+
+			<cfset loc.matches = ReFindNoCaseValues(arguments.template, variables.Mustache.SectionRegEx)/>
+
 			<cfif arrayLen(loc.matches) eq 0>
 				<cfbreak/>
 			</cfif>
-	
+
 			<cfset loc.tag = loc.matches[1]/>
 			<cfset loc.type = loc.matches[2]/>
 			<cfset loc.tagName = loc.matches[3]/>
 			<cfset loc.inner = loc.matches[4]/>
 			<cfset loc.rendered = renderSection(loc.tagName, loc.type, loc.inner, arguments.context, arguments.partials)/>
-	
+
 			<!--- trims out empty lines from appearing in the output --->
 			<cfif len(trim(loc.rendered)) eq 0>
 				<cfset loc.rendered = "$2"/>
@@ -78,11 +96,11 @@
 				<!--- escape the backreference --->
 				<cfset loc.rendered = replace(loc.rendered, "$", "\$", "all")/>
 			</cfif>
-	
+
 			<!--- we use a regex to remove unwanted whitespacing from appearing --->
 			<cfset arguments.template = createObject("java","java.util.regex.Pattern").compile(javaCast("string", "(^\r?\n?)?(\r?\n?)?\Q" & loc.tag & "\E(\r?\n?)?"), 40).matcher(javaCast("string", arguments.template)).replaceAll(loc.rendered)/>
 		</cfloop>
-		
+
 		<cfreturn arguments.template/>
 	</cffunction>
 
@@ -92,7 +110,7 @@
 		<cfargument name="inner"/>
 		<cfargument name="context"/>
 		<cfargument name="partials"/>
-		<cfset var loc = {}>
+		<cfset var loc = {}/>
 
 		<cfset loc.ctx = get(arguments.tagName, arguments.context, arguments.partials)/>
 
@@ -109,7 +127,7 @@
 		<cfif arguments.type eq "^" xor convertToBoolean(loc.ctx)>
 			<cfreturn arguments.inner/>
 		</cfif>
-		
+
 		<cfreturn ""/>
 	</cffunction>
 
@@ -125,7 +143,7 @@
 		<cfif isObject(arguments.context)>
 			<!--- call the function and pass in the arguments --->
 			<cfinvoke component="#arguments.context#" method="#arguments.tagName#" returnvariable="loc.results">
-				<cfinvokeargument name="1" value="#arguments.template#">
+				<cfinvokeargument name="1" value="#arguments.template#" />
 			</cfinvoke>
 		<!--- otherwise we have a struct w/a reference to a function or closure --->
 		<cfelse>
@@ -149,7 +167,7 @@
 			<cfreturn !StructIsEmpty(arguments.value)>
 		</cfif>
 		<cfif isQuery(arguments.value)>
-			<cfreturn arguments.value.recordcount neq 0>
+			<cfreturn arguments.value.recordcount neq 0/>
 		</cfif>
 		<cfif isArray(arguments.value)>
 			<cfreturn !ArrayIsEmpty(arguments.value)>
@@ -162,31 +180,31 @@
 		<cfargument name="template"/>
 		<cfargument name="context"/>
 		<cfargument name="partials"/>
-		<cfset var result = []/>
+		<cfset var results = []/>
 
 		<!--- trim the trailing whitespace--so we don't print extra lines --->
 		<cfset arguments.template = rtrim(arguments.template)/>
 
 		<cfloop query="arguments.context">
-			<cfset ArrayAppend(result, renderFragment(arguments.template, arguments.context, arguments.partials))/>
+			<cfset ArrayAppend(results, renderFragment(arguments.template, arguments.context, arguments.partials))/>
 		</cfloop>
-		<cfreturn ArrayToList(result, "")/>
+		<cfreturn ArrayToList(results, "")/>
 	</cffunction>
 
 	<cffunction name="renderArraySection" access="private" output="false">
 		<cfargument name="template"/>
 		<cfargument name="context"/>
 		<cfargument name="partials"/>
-		<cfset var loc = {}>
+		<cfset var loc = {}/>
 
 		<!--- trim the trailing whitespace--so we don't print extra lines --->
 		<cfset arguments.template = rtrim(arguments.template)/>
 
-		<cfset loc.result = []/>
+		<cfset loc.results = []/>
 		<cfloop array="#arguments.context#" index="loc.item">
-			<cfset ArrayAppend(loc.result, renderFragment(arguments.template, loc.item, arguments.partials))/>
+			<cfset ArrayAppend(loc.results, renderFragment(arguments.template, loc.item, arguments.partials))/>
 		</cfloop>
-		<cfreturn ArrayToList(loc.result, "")/>
+		<cfreturn ArrayToList(loc.results, "")/>
 	</cffunction>
 
 	<cffunction name="renderTags" access="private" output="false">
@@ -194,11 +212,11 @@
 		<cfargument name="context"/>
 		<cfargument name="partials"/>
 		<cfset var loc = {}/>
-	
+
 		<cfloop condition = "true" >
-			
-			<cfset loc.matches = ReFindNoCaseValues(arguments.template, variables.TagRegEx)/>
-			
+
+			<cfset loc.matches = ReFindNoCaseValues(arguments.template, variables.Mustache.TagRegEx)/>
+
 			<cfif arrayLen(loc.matches) eq 0>
 				<cfbreak/>
 			</cfif>
@@ -209,7 +227,7 @@
 			<!--- gets the ".*" capture --->
 			<cfset loc.extra = loc.matches[4]/>
 			<cfset arguments.template = replace(arguments.template, loc.tag, renderTag(loc.type, loc.tagName, arguments.context, arguments.partials, loc.extra))/>
-			
+
 		</cfloop>
 
 		<cfreturn arguments.template/>
@@ -224,9 +242,9 @@
 		<cfset var loc = {}/>
 		<cfset var results = ""/>
 		<cfset var extras = listToArray(arguments.extra, ":")/>
-		
+
 		<cfif arguments.type eq "!">
-			<cfreturn "">
+			<cfreturn ""/>
 		<cfelseif (arguments.type eq "{") or (arguments.type eq "&")>
 			<cfset results = get(arguments.tagName, arguments.context, arguments.partials)/>
 		<cfelseif arguments.type eq ">">
@@ -234,7 +252,7 @@
 		<cfelse>
 			<cfset results = htmlEditFormat(get(arguments.tagName, arguments.context, arguments.partials))/>
 		</cfif>
-		
+
 		<cfreturn onRenderTag(results, arguments)/>
 	</cffunction>
 
@@ -323,12 +341,12 @@
 	</cffunction>
 
 	<cffunction name="getPartials" access="public" output="false">
-		<cfreturn variables.partials/>
+		<cfreturn variables.Mustache.partials/>
 	</cffunction>
 
 	<cffunction name="setPartials" access="public" output="false">
 		<cfargument name="partials" required="true">
-		<cfset variables.partials = arguments.partials/>
+		<cfset variables.Mustache.partials = arguments.partials/>
 	</cffunction>
 
 </cfcomponent>

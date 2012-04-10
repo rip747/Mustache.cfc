@@ -23,7 +23,7 @@
 --->
 
 	<!---// captures arguments to be passed to formatter functions //--->
-	<cfset variables.ArgumentsRegEx = createObject("java","java.util.regex.Pattern").compile("[^\s,]*(?<!\\)\(.*?(?<!\\)\)|(?<!\\)\[.*?(?<!\\)\]|(?<!\\)\{.*?(?<!\\)\}|(?<!\\)('|"").*?(?<!\\)\1|(?:(?!,)\S)+", 40) />
+	<cfset variables.Mustache.ArgumentsRegEx = createObject("java","java.util.regex.Pattern").compile("[^\s,]*(?<!\\)\(.*?(?<!\\)\)|(?<!\\)\[.*?(?<!\\)\]|(?<!\\)\{.*?(?<!\\)\}|(?<!\\)('|"").*?(?<!\\)\1|(?:(?!,)\S)+", 40) />
 
 	<!---// overwrite the default methods //--->
   <cffunction name="onRenderTag" access="private" output="false">
@@ -51,7 +51,7 @@
 					<!---// get the arguments from the function name //--->
 					<cfset local.args = replace(local.fn, local.fnName & "(", "") />
 					<!---// gets the arguments from the string //--->
-					<cfset local.args = regexMatch(left(local.args, len(local.args)-1), variables.ArgumentsRegEx) />
+					<cfset local.args = regexMatch(left(local.args, len(local.args)-1), variables.Mustache.ArgumentsRegEx) />
 				<cfelse>
 					<cfset local.args = [] />
 				</cfif>
