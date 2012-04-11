@@ -47,6 +47,7 @@
 		<cfargument name="template" default="#readMustacheFile(ListLast(getMetaData(this).name, '.'))#"/>
 		<cfargument name="context" default="#this#"/>
 		<cfargument name="partials" hint="the partial objects" required="true" default="#structNew()#"/>
+
 		<cfset var results = renderFragment(argumentCollection=arguments)/>
 
 		<!--- remove single blank lines at the head/tail of the stream --->
@@ -73,32 +74,33 @@
 		<cfargument name="template"/>
 		<cfargument name="context"/>
 		<cfargument name="partials"/>
-		<cfset var loc = {}/>
+
+		<cfset var local = {}/>
 
 		<cfloop condition = "true">
 
-			<cfset loc.matches = ReFindNoCaseValues(arguments.template, variables.Mustache.SectionRegEx)/>
+			<cfset local.matches = ReFindNoCaseValues(arguments.template, variables.Mustache.SectionRegEx)/>
 
-			<cfif arrayLen(loc.matches) eq 0>
+			<cfif arrayLen(local.matches) eq 0>
 				<cfbreak/>
 			</cfif>
 
-			<cfset loc.tag = loc.matches[1]/>
-			<cfset loc.type = loc.matches[2]/>
-			<cfset loc.tagName = loc.matches[3]/>
-			<cfset loc.inner = loc.matches[4]/>
-			<cfset loc.rendered = renderSection(loc.tagName, loc.type, loc.inner, arguments.context, arguments.partials)/>
+			<cfset local.tag = local.matches[1]/>
+			<cfset local.type = local.matches[2]/>
+			<cfset local.tagName = local.matches[3]/>
+			<cfset local.inner = local.matches[4]/>
+			<cfset local.rendered = renderSection(local.tagName, local.type, local.inner, arguments.context, arguments.partials)/>
 
 			<!--- trims out empty lines from appearing in the output --->
-			<cfif len(trim(loc.rendered)) eq 0>
-				<cfset loc.rendered = "$2"/>
+			<cfif len(trim(local.rendered)) eq 0>
+				<cfset local.rendered = "$2"/>
 			<cfelse>
 				<!--- escape the backreference --->
-				<cfset loc.rendered = replace(loc.rendered, "$", "\$", "all")/>
+				<cfset local.rendered = replace(local.rendered, "$", "\$", "all")/>
 			</cfif>
 
 			<!--- we use a regex to remove unwanted whitespacing from appearing --->
-			<cfset arguments.template = createObject("java","java.util.regex.Pattern").compile(javaCast("string", "(^\r?\n?)?(\r?\n?)?\Q" & loc.tag & "\E(\r?\n?)?"), 40).matcher(javaCast("string", arguments.template)).replaceAll(loc.rendered)/>
+			<cfset arguments.template = createObject("java","java.util.regex.Pattern").compile(javaCast("string", "(^\r?\n?)?(\r?\n?)?\Q" & local.tag & "\E(\r?\n?)?"), 40).matcher(javaCast("string", arguments.template)).replaceAll(local.rendered)/>
 		</cfloop>
 
 		<cfreturn arguments.template/>
@@ -110,21 +112,22 @@
 		<cfargument name="inner"/>
 		<cfargument name="context"/>
 		<cfargument name="partials"/>
-		<cfset var loc = {}/>
 
-		<cfset loc.ctx = get(arguments.tagName, arguments.context, arguments.partials)/>
+		<cfset var local = {}/>
 
-		<cfif arguments.type neq "^" and isStruct(loc.ctx) and !StructIsEmpty(loc.ctx)>
-			<cfreturn renderFragment(arguments.inner, loc.ctx, arguments.partials)/>
-		<cfelseif arguments.type neq "^" and isQuery(loc.ctx) AND loc.ctx.recordCount>
-			<cfreturn renderQuerySection(arguments.inner, loc.ctx, arguments.partials)/>
-		<cfelseif arguments.type neq "^" and isArray(loc.ctx) and !ArrayIsEmpty(loc.ctx)>
-			<cfreturn renderArraySection(arguments.inner, loc.ctx, arguments.partials)/>
+		<cfset local.ctx = get(arguments.tagName, arguments.context, arguments.partials)/>
+
+		<cfif arguments.type neq "^" and isStruct(local.ctx) and !StructIsEmpty(local.ctx)>
+			<cfreturn renderFragment(arguments.inner, local.ctx, arguments.partials)/>
+		<cfelseif arguments.type neq "^" and isQuery(local.ctx) AND local.ctx.recordCount>
+			<cfreturn renderQuerySection(arguments.inner, local.ctx, arguments.partials)/>
+		<cfelseif arguments.type neq "^" and isArray(local.ctx) and !ArrayIsEmpty(local.ctx)>
+			<cfreturn renderArraySection(arguments.inner, local.ctx, arguments.partials)/>
 		<cfelseif arguments.type neq "^" and structKeyExists(arguments.context, arguments.tagName) and isCustomFunction(arguments.context[arguments.tagName])>
 			<cfreturn renderLambda(arguments.tagName, arguments.inner, arguments.context, arguments.partials)/>
 		</cfif>
 
-		<cfif arguments.type eq "^" xor convertToBoolean(loc.ctx)>
+		<cfif arguments.type eq "^" xor convertToBoolean(local.ctx)>
 			<cfreturn arguments.inner/>
 		</cfif>
 
@@ -137,21 +140,22 @@
 		<cfargument name="template" />
 		<cfargument name="context" />
 		<cfargument name="partials"/>
-		<cfset var loc = {} />
+
+		<cfset var local = {} />
 
 		<!--- if running on a component --->
 		<cfif isObject(arguments.context)>
 			<!--- call the function and pass in the arguments --->
-			<cfinvoke component="#arguments.context#" method="#arguments.tagName#" returnvariable="loc.results">
+			<cfinvoke component="#arguments.context#" method="#arguments.tagName#" returnvariable="local.results">
 				<cfinvokeargument name="1" value="#arguments.template#" />
 			</cfinvoke>
 		<!--- otherwise we have a struct w/a reference to a function or closure --->
 		<cfelse>
-			<cfset loc.fn = arguments.context[arguments.tagName] />
-			<cfset loc.results = loc.fn(arguments.template) />
+			<cfset local.fn = arguments.context[arguments.tagName] />
+			<cfset local.results = local.fn(arguments.template) />
 		</cfif>
 
-		<cfreturn loc.results />
+		<cfreturn local.results />
 	</cffunction>
 
 	<cffunction name="convertToBoolean">
@@ -160,7 +164,7 @@
 		<cfif isBoolean(arguments.value)>
 			<cfreturn arguments.value/>
 		</cfif>
-		<cfif IsSimpleValue(arguments.value)>
+		<cfif isSimpleValue(arguments.value)>
 			<cfreturn arguments.value neq ""/>
 		</cfif>
 		<cfif isStruct(arguments.value)>
@@ -180,6 +184,7 @@
 		<cfargument name="template"/>
 		<cfargument name="context"/>
 		<cfargument name="partials"/>
+
 		<cfset var results = []/>
 
 		<!--- trim the trailing whitespace--so we don't print extra lines --->
@@ -195,38 +200,40 @@
 		<cfargument name="template"/>
 		<cfargument name="context"/>
 		<cfargument name="partials"/>
-		<cfset var loc = {}/>
+
+		<cfset var local = {}/>
 
 		<!--- trim the trailing whitespace--so we don't print extra lines --->
 		<cfset arguments.template = rtrim(arguments.template)/>
 
-		<cfset loc.results = []/>
-		<cfloop array="#arguments.context#" index="loc.item">
-			<cfset ArrayAppend(loc.results, renderFragment(arguments.template, loc.item, arguments.partials))/>
+		<cfset local.results = []/>
+		<cfloop array="#arguments.context#" index="local.item">
+			<cfset ArrayAppend(local.results, renderFragment(arguments.template, local.item, arguments.partials))/>
 		</cfloop>
-		<cfreturn ArrayToList(loc.results, "")/>
+		<cfreturn ArrayToList(local.results, "")/>
 	</cffunction>
 
 	<cffunction name="renderTags" access="private" output="false">
 		<cfargument name="template"/>
 		<cfargument name="context"/>
 		<cfargument name="partials"/>
-		<cfset var loc = {}/>
+
+		<cfset var local = {}/>
 
 		<cfloop condition = "true" >
 
-			<cfset loc.matches = ReFindNoCaseValues(arguments.template, variables.Mustache.TagRegEx)/>
+			<cfset local.matches = ReFindNoCaseValues(arguments.template, variables.Mustache.TagRegEx)/>
 
-			<cfif arrayLen(loc.matches) eq 0>
+			<cfif arrayLen(local.matches) eq 0>
 				<cfbreak/>
 			</cfif>
 
-			<cfset loc.tag = loc.matches[1]/>
-			<cfset loc.type = loc.matches[2]/>
-			<cfset loc.tagName = loc.matches[3]/>
+			<cfset local.tag = local.matches[1]/>
+			<cfset local.type = local.matches[2]/>
+			<cfset local.tagName = local.matches[3]/>
 			<!--- gets the ".*" capture --->
-			<cfset loc.extra = loc.matches[4]/>
-			<cfset arguments.template = replace(arguments.template, loc.tag, renderTag(loc.type, loc.tagName, arguments.context, arguments.partials, loc.extra))/>
+			<cfset local.extra = local.matches[4]/>
+			<cfset arguments.template = replace(arguments.template, local.tag, renderTag(local.type, local.tagName, arguments.context, arguments.partials, local.extra))/>
 
 		</cfloop>
 
@@ -239,7 +246,8 @@
 		<cfargument name="context"/>
 		<cfargument name="partials"/>
 		<cfargument name="extra" hint="The text appearing after the tag name"/>
-		<cfset var loc = {}/>
+
+		<cfset var local = {}/>
 		<cfset var results = ""/>
 		<cfset var extras = listToArray(arguments.extra, ":")/>
 
@@ -260,6 +268,7 @@
 		hint="override this function in your methods to provide additional formatting to rendered content">
 		<cfargument name="rendered"/>
 		<cfargument name="options" hint="Arguments supplied to the renderTag() function"/>
+
 		<!--- do nothing but return the passed in value --->
 		<cfreturn arguments.rendered/>
 	</cffunction>
@@ -280,7 +289,9 @@
 
 	<cffunction name="readMustacheFile" access="private" output="false">
 		<cfargument name="filename"/>
+
 		<cfset var template= ""/>
+
 		<cffile action="read" file="#getDirectoryFromPath(getMetaData(this).path)##arguments.filename#.mustache" variable="template"/>
 		<cfreturn trim(template)/>
 	</cffunction>
@@ -289,14 +300,15 @@
 		<cfargument name="key"/>
 		<cfargument name="context"/>
 		<cfargument name="partials"/>
-		<cfset var loc = {}/>
+
+		<cfset var local = {}/>
 
 		<!--- if we're a nested key, do a nested lookup --->
 		<cfif find(".", arguments.key)>
-			<cfset loc.key = listRest(arguments.key, ".")/>
-			<cfset loc.root = listFirst(arguments.key, ".")/>
-			<cfif structKeyExists(arguments.context, loc.root)>
-				<cfreturn get(loc.key, context[loc.root], arguments.partials)/>
+			<cfset local.key = listRest(arguments.key, ".")/>
+			<cfset local.root = listFirst(arguments.key, ".")/>
+			<cfif structKeyExists(arguments.context, local.root)>
+				<cfreturn get(local.key, context[local.root], arguments.partials)/>
 			<cfelse>
 				<cfreturn ""/>
 			</cfif>
@@ -320,24 +332,25 @@
 	<cffunction name="ReFindNoCaseValues" access="private" output="false">
 		<cfargument name="text"/>
 		<cfargument name="re"/>
-		<cfset var loc = {}>
 
-		<cfset loc.results = []/>
-		<cfset loc.matcher = arguments.re.matcher(arguments.text)/>
-		<cfset loc.i = 0/>
-		<cfset loc.nextMatch = ""/>
-		<cfif loc.matcher.Find()>
-			<cfloop index="loc.i" from="0" to="#loc.matcher.groupCount()#">
-				<cfset loc.nextMatch = loc.matcher.group(loc.i)/>
-				<cfif isDefined('loc.nextMatch')>
-					<cfset arrayAppend(loc.results, loc.nextMatch)/>
+		<cfset var local = {}>
+
+		<cfset local.results = []/>
+		<cfset local.matcher = arguments.re.matcher(arguments.text)/>
+		<cfset local.i = 0/>
+		<cfset local.nextMatch = ""/>
+		<cfif local.matcher.Find()>
+			<cfloop index="local.i" from="0" to="#local.matcher.groupCount()#">
+				<cfset local.nextMatch = local.matcher.group(local.i)/>
+				<cfif isDefined('local.nextMatch')>
+					<cfset arrayAppend(local.results, local.nextMatch)/>
 				<cfelse>
-					<cfset arrayAppend(loc.results, "")/>
+					<cfset arrayAppend(local.results, "")/>
 				</cfif>
 			</cfloop>
 		</cfif>
 
-		<cfreturn loc.results/>
+		<cfreturn local.results/>
 	</cffunction>
 
 	<cffunction name="getPartials" access="public" output="false">
@@ -346,6 +359,7 @@
 
 	<cffunction name="setPartials" access="public" output="false">
 		<cfargument name="partials" required="true">
+
 		<cfset variables.Mustache.partials = arguments.partials/>
 	</cffunction>
 

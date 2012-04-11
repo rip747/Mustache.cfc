@@ -74,22 +74,23 @@
 	<cffunction name="regexMatch" access="private" output="false">
 		<cfargument name="text"/>
 		<cfargument name="re"/>
-		<cfset var loc = {}>
 
-		<cfset loc.results = []/>
-		<cfset loc.matcher = arguments.re.matcher(arguments.text)/>
-		<cfset loc.i = 0 />
-		<cfset loc.nextMatch = "" />
-		<cfloop condition="#loc.matcher.find()#">
-			<cfset loc.nextMatch = loc.matcher.group(0) />
-			<cfif isDefined('loc.nextMatch')>
-				<cfset arrayAppend(loc.results, loc.nextMatch) />
+		<cfset var local = {}>
+
+		<cfset local.results = []/>
+		<cfset local.matcher = arguments.re.matcher(arguments.text)/>
+		<cfset local.i = 0 />
+		<cfset local.nextMatch = "" />
+		<cfloop condition="#local.matcher.find()#">
+			<cfset local.nextMatch = local.matcher.group(0) />
+			<cfif isDefined('local.nextMatch')>
+				<cfset arrayAppend(local.results, local.nextMatch) />
 			<cfelse>
-				<cfset arrayAppend(loc.results, "") />
+				<cfset arrayAppend(local.results, "") />
 			</cfif>
 		</cfloop>
 
-		<cfreturn loc.results />
+		<cfreturn local.results />
 	</cffunction>
 
 	<!---//
