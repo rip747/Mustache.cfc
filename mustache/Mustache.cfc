@@ -23,7 +23,7 @@
 	<cfset variables.Mustache = structNew() />
 
 	<!--- captures the ".*" match for looking for formatters (see #2) and also allows nested structure references (see #3), removes looking for comments --->
-	<cfset variables.Mustache.TagRegEx = createObject("java","java.util.regex.Pattern").compile("\{\{(\{|&|\>)?\s*(\w+(?:(?:\.\w+){1,})?)(.*?)\}?\}\}", 32)/>
+	<cfset variables.Mustache.TagRegEx = createObject("java","java.util.regex.Pattern").compile("\{\{(\{|&|\>)?\s*((?:\w+(?:(?:\.\w+){1,})?)|\.)(.*?)\}?\}\}", 32)/>
 	<!--- captures nested structure references --->
 	<cfset variables.Mustache.SectionRegEx = createObject("java","java.util.regex.Pattern").compile("\{\{(##|\^)\s*(\w+(?:(?:\.\w+){1,})?)\s*}}(.*?)\{\{/\s*\2\s*\}\}", 32)/>
 	<!--- captures nested structure references --->
@@ -78,7 +78,6 @@
 		<cfset var local = {}/>
 
 		<cfloop condition = "true">
-
 			<cfset local.matches = ReFindNoCaseValues(arguments.template, variables.Mustache.SectionRegEx)/>
 
 			<cfif arrayLen(local.matches) eq 0>
@@ -121,7 +120,7 @@
 			<cfreturn renderFragment(arguments.inner, local.ctx, arguments.partials)/>
 		<cfelseif arguments.type neq "^" and isQuery(local.ctx) AND local.ctx.recordCount>
 			<cfreturn renderQuerySection(arguments.inner, local.ctx, arguments.partials)/>
-		<cfelseif arguments.type neq "^" and isArray(local.ctx) and !ArrayIsEmpty(local.ctx)>
+		<cfelseif arguments.type neq "^" and isArray(local.ctx) and !arrayIsEmpty(local.ctx)>
 			<cfreturn renderArraySection(arguments.inner, local.ctx, arguments.partials)/>
 		<cfelseif arguments.type neq "^" and structKeyExists(arguments.context, arguments.tagName) and isCustomFunction(arguments.context[arguments.tagName])>
 			<cfreturn renderLambda(arguments.tagName, arguments.inner, arguments.context, arguments.partials)/>
@@ -158,7 +157,7 @@
 		<cfreturn local.results />
 	</cffunction>
 
-	<cffunction name="convertToBoolean">
+	<cffunction name="convertToBoolean" access="private" output="false">
 		<cfargument name="value"/>
 
 		<cfif isBoolean(arguments.value)>
@@ -174,7 +173,7 @@
 			<cfreturn arguments.value.recordcount neq 0/>
 		</cfif>
 		<cfif isArray(arguments.value)>
-			<cfreturn !ArrayIsEmpty(arguments.value)>
+			<cfreturn !arrayIsEmpty(arguments.value)>
 		</cfif>
 
 		<cfreturn false>
@@ -191,9 +190,9 @@
 		<cfset arguments.template = rtrim(arguments.template)/>
 
 		<cfloop query="arguments.context">
-			<cfset ArrayAppend(results, renderFragment(arguments.template, arguments.context, arguments.partials))/>
+			<cfset arrayAppend(results, renderFragment(arguments.template, arguments.context, arguments.partials))/>
 		</cfloop>
-		<cfreturn ArrayToList(results, "")/>
+		<cfreturn arrayToList(results, "")/>
 	</cffunction>
 
 	<cffunction name="renderArraySection" access="private" output="false">
@@ -208,9 +207,9 @@
 
 		<cfset local.results = []/>
 		<cfloop array="#arguments.context#" index="local.item">
-			<cfset ArrayAppend(local.results, renderFragment(arguments.template, local.item, arguments.partials))/>
+			<cfset arrayAppend(local.results, renderFragment(arguments.template, local.item, arguments.partials))/>
 		</cfloop>
-		<cfreturn ArrayToList(local.results, "")/>
+		<cfreturn arrayToList(local.results, "")/>
 	</cffunction>
 
 	<cffunction name="renderTags" access="private" output="false">
@@ -254,14 +253,35 @@
 		<cfif arguments.type eq "!">
 			<cfreturn ""/>
 		<cfelseif (arguments.type eq "{") or (arguments.type eq "&")>
-			<cfset results = get(arguments.tagName, arguments.context, arguments.partials)/>
+			<cfset arguments.value = get(arguments.tagName, arguments.context, arguments.partials)/>
+			<cfset arguments.valueType = "text"/>
+			<cfset results = textEncode(arguments.value)/>
 		<cfelseif arguments.type eq ">">
-			<cfset results = renderPartial(arguments.tagName, arguments.context, arguments.partials)/>
+			<cfset arguments.value = renderPartial(arguments.tagName, arguments.context, arguments.partials)/>
+			<cfset arguments.valueType = "partial"/>
+			<cfset results = arguments.value/>
 		<cfelse>
-			<cfset results = htmlEditFormat(get(arguments.tagName, arguments.context, arguments.partials))/>
+			<cfset arguments.value = get(arguments.tagName, arguments.context, arguments.partials)/>
+			<cfset arguments.valueType = "html"/>
+			<cfset results = htmlEncode(arguments.value)/>
 		</cfif>
 
 		<cfreturn onRenderTag(results, arguments)/>
+	</cffunction>
+
+	<cffunction name="textEncode" access="private" output="false"
+		hint="Encodes a plain text string (can be overridden)">
+		<cfargument name="input"/>
+
+		<!--- we normally don't want to do anything, but this function is manually so we can overwrite the default behavior of {{{token}}} --->
+		<cfreturn arguments.input />
+	</cffunction>
+
+	<cffunction name="htmlEncode" access="private" output="false"
+		hint="Encodes a string into HTML (can be overridden)">
+		<cfargument name="input"/>
+
+		<cfreturn htmlEditFormat(arguments.input)/>
 	</cffunction>
 
 	<cffunction name="onRenderTag" access="private" output="false"
@@ -303,8 +323,11 @@
 
 		<cfset var local = {}/>
 
+		<!--- if we are the implicit iterator --->
+		<cfif arguments.key eq ".">
+			<cfreturn toString(context) />
 		<!--- if we're a nested key, do a nested lookup --->
-		<cfif find(".", arguments.key)>
+		<cfelseif find(".", arguments.key)>
 			<cfset local.key = listRest(arguments.key, ".")/>
 			<cfset local.root = listFirst(arguments.key, ".")/>
 			<cfif structKeyExists(arguments.context, local.root)>
