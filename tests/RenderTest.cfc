@@ -456,6 +456,73 @@ Here are the history notes:
 		</cfscript>
 	</cffunction>
 
+	<cffunction name="whiteSpaceManagementWithElseIffy">
+		<cfscript>
+			context = {
+				  name="Dan"
+				, value=1000
+				, taxValue=600
+				, in_ca=false
+				, html="<b>some html</b>"
+			};
+
+			template = trim('
+Hello "{{name}}"
+You have just won ${{value}}!
+
+{{##in_ca}}
+Well, ${{taxValue}}, after taxes.
+{{/in_ca}}
+{{^in_ca}}
+No new taxes!
+{{/in_ca}}
+
+I did{{^in_ca}} <strong><em>not</em></strong>{{/in_ca}} calculate taxes.
+			');
+
+			expected = trim('
+Hello "Dan"
+You have just won $1000!
+
+No new taxes!
+
+I did <strong><em>not</em></strong> calculate taxes.
+			');
+		</cfscript>
+	</cffunction>
+
+	<cffunction name="whiteSpaceManagementWithEmptyElseIffy">
+		<cfscript>
+			context = {
+				  name="Dan"
+				, value=1000
+				, taxValue=600
+				, in_ca=false
+				, html="<b>some html</b>"
+			};
+
+			template = trim('
+Hello "{{name}}"
+You have just won ${{value}}!
+
+{{##in_ca}}
+Well, ${{taxValue}}, after taxes.
+{{/in_ca}}
+{{^in_ca}}
+{{/in_ca}}
+
+I did{{^in_ca}} <strong><em>not</em></strong>{{/in_ca}} calculate taxes.
+			');
+
+			expected = trim('
+Hello "Dan"
+You have just won $1000!
+
+I did <strong><em>not</em></strong> calculate taxes.
+			');
+		</cfscript>
+	</cffunction>
+
 	<cffunction name="multilineComments">
 		<cfscript>
 	    context = { thing = 'world'};

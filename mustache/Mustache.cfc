@@ -79,6 +79,7 @@
 		<cfargument name="options" />
 
 		<cfset var local = {}/>
+		<cfset lastSectionPosition = -1/>
 
 		<cfloop condition = "true">
 			<cfset local.matches = ReFindNoCaseValues(arguments.template, variables.Mustache.SectionRegEx)/>
@@ -93,6 +94,9 @@
 			<cfset local.inner = local.matches[4]/>
 			<cfset local.rendered = renderSection(local.tagName, local.type, local.inner, arguments.context, arguments.partials, arguments.options)/>
 
+			<!--- look to see where the current tag exists in the output; which we use to see if starting whitespace should be trimmed ---->
+			<cfset local.sectionPosition = find(local.tag, arguments.template)/>
+
 			<!--- trims out empty lines from appearing in the output --->
 			<cfif len(trim(local.rendered)) eq 0>
 				<cfset local.rendered = "$2"/>
@@ -101,8 +105,24 @@
 				<cfset local.rendered = replace(local.rendered, "$", "\$", "all")/>
 			</cfif>
 
+			<!--- if the current section is in the same place as the last template, we do not need to clean up whitespace--because it's already been managed --->
+			<cfif local.sectionPosition lt lastSectionPosition>
+				<!--- do not remove whitespace before the output, because we have already cleaned it --->
+				<cfset local.whiteSpaceRegex = ""/>
+				<!--- rendered content was empty, so we just want to replace all the text --->
+				<cfif local.rendered eq "$2">
+					<!--- no whitespace to clean up --->
+					<cfset local.rendered = ""/>
+				</cfif>
+			<cfelse>
+				<!--- clean out the extra lines of whitespace from the output --->
+				<cfset local.whiteSpaceRegex = "(^\r?\n?)?(\r?\n?)?"/>
+			</cfif>
 			<!--- we use a regex to remove unwanted whitespacing from appearing --->
-			<cfset arguments.template = createObject("java","java.util.regex.Pattern").compile(javaCast("string", "(^\r?\n?)?(\r?\n?)?\Q" & local.tag & "\E(\r?\n?)?"), 40).matcher(javaCast("string", arguments.template)).replaceAll(local.rendered)/>
+			<cfset arguments.template = createObject("java","java.util.regex.Pattern").compile(javaCast("string", local.whiteSpaceRegex & "\Q" & local.tag & "\E(\r?\n?)?"), 40).matcher(javaCast("string", arguments.template)).replaceAll(local.rendered)/>
+
+			<!--- track the position of the last section ---->
+			<cfset lastSectionPosition = local.sectionPosition />
 		</cfloop>
 
 		<cfreturn arguments.template/>
