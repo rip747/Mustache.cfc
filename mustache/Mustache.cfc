@@ -79,7 +79,7 @@
 		<cfargument name="options" />
 
 		<cfset var local = {}/>
-		<cfset lastSectionPosition = -1/>
+		<cfset var lastSectionPosition = -1/>
 
 		<cfloop condition = "true">
 			<cfset local.matches = ReFindNoCaseValues(arguments.template, variables.Mustache.SectionRegEx)/>

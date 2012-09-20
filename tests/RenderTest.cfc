@@ -523,6 +523,54 @@ I did <strong><em>not</em></strong> calculate taxes.
 		</cfscript>
 	</cffunction>
 
+	<cffunction name="whiteSpaceManagementWithEmptyValue">
+		<cfscript>
+			context = {
+				  empty_value=""
+			};
+
+			template = trim('
+First line!
+
+{{empty_value}}
+
+Last line!
+			');
+
+			expected = trim('
+First line!
+
+
+
+Last line!
+			');
+		</cfscript>
+	</cffunction>
+
+	<cffunction name="whiteSpaceManagementWithNonEmptyValue">
+		<cfscript>
+			context = {
+				  not_empty_value="here!"
+			};
+
+			template = trim('
+First line!
+
+{{not_empty_value}}
+
+Last line!
+			');
+
+			expected = trim('
+First line!
+
+here!
+
+Last line!
+			');
+		</cfscript>
+	</cffunction>
+
 	<cffunction name="multilineComments">
 		<cfscript>
 	    context = { thing = 'world'};
