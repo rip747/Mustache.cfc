@@ -30,14 +30,18 @@
 	<cfset variables.Mustache.CommentRegEx = createObject("java","java.util.regex.Pattern").compile("((^\r?\n?)|\s+)?\{\{!.*?\}\}(\r?\n?(\r?\n?)?)?", 40)/>
 	<!--- captures nested structure references --->
 	<cfset variables.Mustache.HeadTailBlankLinesRegEx = createObject("java","java.util.regex.Pattern").compile(javaCast("string", "(^(\r?\n))|((?<!(\r?\n))(\r?\n)$)"), 32)/>
+	<!--- Extends {{<wrapper.html}}Template Body Here{{/wrapper.html}} + captures nested structure references --->
+	<cfset variables.Mustache.ExtendsRegEx = createObject("java","java.util.regex.Pattern").compile(javaCast("string", "\{\{(\<)\s*(\w+(?:(?:\.\w+){1,})?)\s*}}(.*?)\{\{/\s*\2\s*\}\}"), 32) />
 	<!--- for tracking partials --->
 	<cfset variables.Mustache.partials = {}/>
 
 	<cffunction name="init" access="public" output="false"
 		hint="initalizes and returns the object">
 		<cfargument name="partials" hint="the partial objects" default="#StructNew()#">
+		<cfargument name="extendsTagBody" type="string" required="false" default="{{%body%}}" />
 
 		<cfset setPartials(arguments.partials)/>
+		<cfset variables.extendsTagBody = arguments.extendsTagBody />
 
 		<cfreturn this/>
 	</cffunction>
@@ -66,10 +70,46 @@
 
 		<!--- clean the comments from the template --->
 		<cfset arguments.template = variables.Mustache.CommentRegEx.matcher(javaCast("string", arguments.template)).replaceAll("$3")/>
-
+		<!--- Extends templates (Do we need an extends cache?)--->
+		<cfset arguments.template = renderExtends(template=arguments.template, context=arguments.context, partials=arguments.partials, options=arguments.options) />
 		<cfset structAppend(arguments.partials, variables.Mustache.partials, false)/>
 		<cfset arguments.template = renderSections(arguments.template, arguments.context, arguments.partials, arguments.options)/>
 		<cfreturn renderTags(arguments.template, arguments.context, arguments.partials, arguments.options)/>
+	</cffunction>
+
+	<cffunction name="renderExtends" access="private" output="false" returntype="string">
+		<cfargument name="template" type="string" required="true" />
+		<cfargument name="context" type="struct" required="true" />
+		<cfargument name="partials" type="struct" required="true" />
+		<cfargument name="options" type="struct" required="true" />
+
+		<cfset var local = {} />
+
+		<cfloop condition = "true">
+			<cfset local.matches = ReFindNoCaseValues(arguments.template, variables.Mustache.ExtendsRegEx) />
+
+			<cfif arrayLen(local.matches) eq 0>
+				<cfbreak/>
+			</cfif>
+
+			<cfset local.tag = local.matches[1] />
+			<cfset local.type = local.matches[2] />
+			<cfset local.tagName = local.matches[3] />
+			<cfset local.inner = local.matches[4] />
+			<!--- Render each extended template one at a time / top down, nested --->
+			<cfset arguments.template = replaceNoCase(arguments.template, local.matches[1], renderExtend(inner=local.matches[4], tagName=local.tagName, partials=arguments.partials), "ONE") />
+		</cfloop>
+		<cfreturn arguments.template/>
+	</cffunction>
+
+	<cffunction name="renderExtend" output="false" access="private" returntype="string">
+		<cfargument name="inner" type="string" required="true" />
+		<cfargument name="tagName" type="string" required="true" />
+		<cfargument name="partials" type="struct" required="true" />
+
+		<cfreturn replaceNoCase(structKeyExists(arguments.partials, arguments.tagName) ? arguments.partials[#arguments.tagName#] : readMustacheFile(arguments.tagName)
+								,variables.extendsTagBody
+								,arguments.inner) />
 	</cffunction>
 
 	<cffunction name="renderSections" access="private" output="false">

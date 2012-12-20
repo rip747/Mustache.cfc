@@ -663,4 +663,16 @@ Support Team
 		') />
 	</cffunction>
 
+  <cffunction name="extendsTemplate">
+
+    <cfscript>
+      partials = {wrapper = "--{{topbit}}--{{%body%}}--{{tailbit}}--"};
+    </cfscript>
+
+    <cfset context = { whatsnew = 'EXTENDS', name = 'Gary', topbit='TOP', tailbit='TAIL' }/>
+    <cfset template = "{{<wrapper}}I have been top and tailed with a double dash top tail (--TOP--) (--TAIL--) from the {{whatsnew}} functionality thanks {{name}}{{/wrapper}}"/>
+    <cfset expected = "--TOP--I have been top and tailed with a double dash top tail (--TOP--) (--TAIL--) from the EXTENDS functionality thanks Gary--TAIL--"/>
+
+  </cffunction>
+
 </cfcomponent>

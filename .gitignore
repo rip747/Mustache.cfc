@@ -5,3 +5,4 @@ mxunit
 /settings.xml
 *.iml
 /out
+WEB-INF
