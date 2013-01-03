@@ -334,9 +334,9 @@
 		<cfargument name="options"/>
 
 		<cfif structKeyExists(arguments.partials, arguments.name)>
-			<cfreturn render(arguments.partials[arguments.name], arguments.context, arguments.partials, arguments.options)/>
+			<cfreturn this.render(arguments.partials[arguments.name], arguments.context, arguments.partials, arguments.options)/>
 		<cfelse>
-			<cfreturn render(readMustacheFile(arguments.name), arguments.context, arguments.partials, arguments.options)/>
+			<cfreturn this.render(readMustacheFile(arguments.name), arguments.context, arguments.partials, arguments.options)/>
 		</cfif>
 
 	</cffunction>
