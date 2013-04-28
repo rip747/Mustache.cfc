@@ -399,7 +399,7 @@
 		<cfset local.nextMatch = ""/>
 		<cfif local.matcher.Find()>
 			<cfloop index="local.i" from="0" to="#local.matcher.groupCount()#">
-				<cfset local.nextMatch = local.matcher.group(local.i)/>
+				<cfset local.nextMatch = local.matcher.group(JavaCast("int",local.i))/>
 				<cfif isDefined('local.nextMatch')>
 					<cfset arrayAppend(local.results, local.nextMatch)/>
 				<cfelse>
