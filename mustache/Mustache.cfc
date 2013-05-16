@@ -21,15 +21,18 @@
 
 	<!--- namespace for Mustache private variables (to avoid name collisions when extending Mustache.cfc) --->
 	<cfset variables.Mustache = structNew() />
-
+	<cfset variables.Mustache.Pattern=createObject("java","java.util.regex.Pattern") />
+	
 	<!--- captures the ".*" match for looking for formatters (see #2) and also allows nested structure references (see #3), removes looking for comments --->
-	<cfset variables.Mustache.TagRegEx = createObject("java","java.util.regex.Pattern").compile("\{\{(\{|&|\>)?\s*((?:\w+(?:(?:\.\w+){1,})?)|\.)(.*?)\}?\}\}", 32)/>
+	<cfset variables.Mustache.TagRegEx = variables.Mustache.Pattern.compile("\{\{(\{|&|\>)?\s*((?:\w+(?:(?:\.\w+){1,})?)|\.)(.*?)\}?\}\}", 32)/>
+	<!--- Partial regex --->
+	<cfset variables.Mustache.PartialRegEx = variables.Mustache.Pattern.compile("\{\{\>\s*((?:\w+(?:(?:\.\w+){1,})?)|\.)(.*?)\}?\}\}", 32)/>
 	<!--- captures nested structure references --->
-	<cfset variables.Mustache.SectionRegEx = createObject("java","java.util.regex.Pattern").compile("\{\{(##|\^)\s*(\w+(?:(?:\.\w+){1,})?)\s*}}(.*?)\{\{/\s*\2\s*\}\}", 32)/>
+	<cfset variables.Mustache.SectionRegEx = variables.Mustache.Pattern.compile("\{\{(##|\^)\s*(\w+(?:(?:\.\w+){1,})?)\s*}}(.*?)\{\{/\s*\2\s*\}\}", 32)/>
 	<!--- captures nested structure references --->
-	<cfset variables.Mustache.CommentRegEx = createObject("java","java.util.regex.Pattern").compile("((^\r?\n?)|\s+)?\{\{!.*?\}\}(\r?\n?(\r?\n?)?)?", 40)/>
+	<cfset variables.Mustache.CommentRegEx = variables.Mustache.Pattern.compile("((^\r?\n?)|\s+)?\{\{!.*?\}\}(\r?\n?(\r?\n?)?)?", 40)/>
 	<!--- captures nested structure references --->
-	<cfset variables.Mustache.HeadTailBlankLinesRegEx = createObject("java","java.util.regex.Pattern").compile(javaCast("string", "(^(\r?\n))|((?<!(\r?\n))(\r?\n)$)"), 32)/>
+	<cfset variables.Mustache.HeadTailBlankLinesRegEx = variables.Mustache.Pattern.compile(javaCast("string", "(^(\r?\n))|((?<!(\r?\n))(\r?\n)$)"), 32)/>
 	<!--- for tracking partials --->
 	<cfset variables.Mustache.partials = {}/>
 
@@ -48,13 +51,33 @@
 		<cfargument name="context" default="#this#"/>
 		<cfargument name="partials" hint="the partial objects" required="true" default="#structNew()#"/>
 		<cfargument name="options" hint="options object (can be used in overridden functions to pass additional instructions)" required="false" default="#structNew()#"/>
-
+		
+		<!--- Replace partials in template --->
+		<cfset arguments.template=replacePartialsInTemplate(arguments.template,arguments.partials) />
+		
 		<cfset var results = renderFragment(argumentCollection=arguments)/>
 
 		<!--- remove single blank lines at the head/tail of the stream --->
 		<cfset results = variables.Mustache.HeadTailBlankLinesRegEx.matcher(javaCast("string", results)).replaceAll("")/>
 
 		<cfreturn results/>
+	</cffunction>
+
+	<cffunction name="replacePartialsInTemplate" access="private" output="false">
+		<cfargument name="template" />
+		<cfargument name="partials"/>
+		
+		<cfset local.matches = ReFindNoCaseValues(arguments.template, variables.Mustache.PartialRegEx)/>
+		
+		<cfif arrayLen(local.matches)>
+			<cfset local.partial = getPartial(trim(local.matches[2]),arguments.partials) />
+			<cfset local.result= ReplaceNoCase(arguments.template,local.matches[1],local.partial) />
+		<cfelse>
+			<cfset local.result=arguments.template />
+		</cfif>		
+		
+		<cfreturn local.result />
+		
 	</cffunction>
 
 	<cffunction name="renderFragment" access="private" output="false"
@@ -119,7 +142,7 @@
 				<cfset local.whiteSpaceRegex = "(^\r?\n?)?(\r?\n?)?"/>
 			</cfif>
 			<!--- we use a regex to remove unwanted whitespacing from appearing --->
-			<cfset arguments.template = createObject("java","java.util.regex.Pattern").compile(javaCast("string", local.whiteSpaceRegex & "\Q" & local.tag & "\E(\r?\n?)?"), 40).matcher(javaCast("string", arguments.template)).replaceAll(local.rendered)/>
+			<cfset arguments.template = variables.Mustache.Pattern.compile(javaCast("string", local.whiteSpaceRegex & "\Q" & local.tag & "\E(\r?\n?)?"), 40).matcher(javaCast("string", arguments.template)).replaceAll(local.rendered)/>
 
 			<!--- track the position of the last section ---->
 			<cfset lastSectionPosition = local.sectionPosition />
@@ -232,11 +255,9 @@
 		<!--- trim the trailing whitespace--so we don't print extra lines --->
 		<cfset arguments.template = rtrim(arguments.template)/>
 
-		<cfset local.results = []/>
-		<cfloop array="#arguments.context#" index="local.item">
-			<cfset arrayAppend(local.results, renderFragment(arguments.template, local.item, arguments.partials, arguments.options))/>
-		</cfloop>
-		<cfreturn arrayToList(local.results, "")/>
+		<cfsavecontent variable="local.results"><cfloop array="#arguments.context#" index="local.item"><cfoutput>#renderFragment(arguments.template, local.item, arguments.partials, arguments.options)#</cfoutput></cfloop></cfsavecontent>
+		
+		<cfreturn local.results />
 	</cffunction>
 
 	<cffunction name="renderTags" access="private" output="false">
@@ -409,6 +430,20 @@
 		</cfif>
 
 		<cfreturn local.results/>
+	</cffunction>
+	
+	<cffunction name="getPartial" access="private" output="false">
+		<cfargument name="name" hint="the name of the partial" required="true">
+		<cfargument name="partials" hint="the partials object" required="false">
+		
+		<cfif structKeyExists(variables.Mustache.partials,arguments.name)>
+			<cfreturn variables.Mustache.partials[arguments.name] />
+		<cfelseif structKeyExists(arguments,"partials") and structKeyExists(arguments.partials, arguments.name)>	
+			<cfreturn arguments.partials[arguments.name] />
+		<cfelse>	
+			<!--- Fetch from file as last resort --->
+			<cfreturn readMustacheFile(arguments.name) />
+		</cfif>
 	</cffunction>
 
 	<cffunction name="getPartials" access="public" output="false">
